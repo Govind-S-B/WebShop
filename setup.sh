@@ -21,31 +21,45 @@ if [ -z "$data" ]; then
   helpFunction
 fi
 
-# Install Python Dependencies
-pip install -r requirements.txt;
+# Install Python Dependencies via conda without prompts
+conda install -y spacy
 
-# Install Environment Dependencies via `conda`
-conda install -c pytorch faiss-cpu;
-conda install -c conda-forge openjdk=11;
+# Install Python Dependencies via pip without prompts
+pip install --no-input -r requirements_arm.txt
 
-# Download dataset into `data` folder via `gdown` command
+# Install Environment Dependencies via `conda` without prompts
+conda install -y -c pytorch faiss-cpu
+conda install -y -c conda-forge openjdk=11
+
+# Helper function to download file if it doesn't exist
+download_if_not_exists() {
+  local url="$1"
+  local filename="$2"
+  if [ ! -f "$filename" ]; then
+    echo "Downloading $filename..."
+    gdown "$url" -O "$filename"
+  else
+    echo "File $filename already exists, skipping download."
+  fi
+}
+
 mkdir -p data;
 cd data;
 if [ "$data" == "small" ]; then
-  gdown https://drive.google.com/uc?id=1EgHdxQ_YxqIQlvvq5iKlCrkEKR6-j0Ib; # items_shuffle_1000 - product scraped info
-  gdown https://drive.google.com/uc?id=1IduG0xl544V_A_jv3tHXC0kyFi7PnyBu; # items_ins_v2_1000 - product attributes
+  download_if_not_exists "https://drive.google.com/uc?id=1EgHdxQ_YxqIQlvvq5iKlCrkEKR6-j0Ib" "items_shuffle_1000.json"
+  download_if_not_exists "https://drive.google.com/uc?id=1IduG0xl544V_A_jv3tHXC0kyFi7PnyBu" "items_ins_v2_1000.json"
 elif [ "$data" == "all" ]; then
-  gdown https://drive.google.com/uc?id=1A2whVgOO0euk5O13n2iYDM0bQRkkRduB; # items_shuffle
-  gdown https://drive.google.com/uc?id=1s2j6NgHljiZzQNL3veZaAiyW_qDEgBNi; # items_ins_v2
+  download_if_not_exists "https://drive.google.com/uc?id=1A2whVgOO0euk5O13n2iYDM0bQRkkRduB" "items_shuffle.json"
+  download_if_not_exists "https://drive.google.com/uc?id=1s2j6NgHljiZzQNL3veZaAiyW_qDEgBNi" "items_ins_v2.json"
 else
-  echo "[ERROR]: argument for `-d` flag not recognized"
+  echo "[ERROR]: argument for \`-d\` flag not recognized"
   helpFunction
 fi
-gdown https://drive.google.com/uc?id=14Kb5SPBk_jfdLZ_CDBNitW98QLDlKR5O # items_human_ins
+download_if_not_exists "https://drive.google.com/uc?id=14Kb5SPBk_jfdLZ_CDBNitW98QLDlKR5O" "items_human_ins.json"
 cd ..
 
 # Download spaCy large NLP model
-python -m spacy download en_core_web_lg
+python -m spacy download en_core_web_sm
 
 # Build search engine index
 cd search_engine
@@ -55,19 +69,4 @@ mkdir -p indexes
 ./run_indexing.sh
 cd ..
 
-# Create logging folder + samples of log data
-get_human_trajs () {
-  PYCMD=$(cat <<EOF
-import gdown
-url="https://drive.google.com/drive/u/1/folders/16H7LZe2otq4qGnKw_Ic1dkt-o3U9Zsto"
-gdown.download_folder(url, quiet=True, remaining_ok=True)
-EOF
-  )
-  python -c "$PYCMD"
-}
 mkdir -p user_session_logs/
-cd user_session_logs/
-echo "Downloading 50 example human trajectories..."
-get_human_trajs
-echo "Downloading example trajectories complete"
-cd ..
